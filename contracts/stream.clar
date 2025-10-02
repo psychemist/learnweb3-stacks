@@ -105,7 +105,7 @@
     (recipient-balance (* block-delta (get payment-per-block stream)))
   )
 
-    ;; think of this as a ternary conditional  structure not a nested if block
+    ;; think of this as a ternary conditional structure not a nested if block
     (if (is-eq who (get recipient stream))
       (- recipient-balance (get withdrawn-balance stream))
       (if (is-eq who (get sender stream))
@@ -113,5 +113,22 @@
         u0
       )
     )
+  )
+)
+
+;; Withdraw received tokens
+(define-public (withdraw
+    (stream-id uint)
+  )
+  (let (
+    (stream (unwrap! (map-get? streams stream-id) ERR_INVALID_STREAM_ID))
+    (balance (balance-of stream-id contract-caller))
+  )
+    (asserts! (is-eq contract-caller (get recipient stream)) ERR_UNAUTHORIZED)
+    (map-set streams stream-id 
+      (merge stream {withdrawn-balance: (+ (get withdrawn-balance stream) balance)})
+    )
+    (try! (as-contract (stx-transfer? balance tx-sender (get recipient stream))))
+    (ok balance)
   )
 )

@@ -151,3 +151,25 @@
     (ok balance)
   )
 )
+
+;; Get hash of stream
+(define-read-only (hash-stream
+    (stream-id uint)
+    (new-payment-per-block uint)
+    (new-timeframe (tuple (start-block uint) (stop-block uint)))
+  )
+  (let (
+    (stream (unwrap! (map-get? streams stream-id) (sha256 0)))
+    (msg (concat (concat (unwrap-panic (to-consensus-buff? stream)) (unwrap-panic (to-consensus-buff? new-payment-per-block))) (unwrap-panic (to-consensus-buff? new-timeframe))))
+  )
+    (sha256 msg)
+  )
+)
+
+;; Signature verification
+(define-read-only (validate-signature (hash (buff 32)) (signature (buff 65)) (signer principal))
+        (is-eq 
+          (principal-of? (unwrap! (secp256k1-recover? hash signature) false)) 
+          (ok signer)
+        )
+)

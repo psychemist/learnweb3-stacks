@@ -1,12 +1,11 @@
 import {
   AppConfig,
-  connect,
+  authenticate,
   disconnect,
-  showConnect,
   type UserData,
   UserSession,
 } from "@stacks/connect";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 export function useStacks() {
   // Initially when the user is not logged in, userData is null
@@ -14,29 +13,32 @@ export function useStacks() {
 
   // create application config that allows
   // storing authentication state in browser's local storage
-  const appConfig = new AppConfig(["store_write"]);
+  const appConfig = useMemo(() => new AppConfig(["store_write"]), []);
 
   // creating a new user session based on the application config
-  const userSession = new UserSession({ appConfig });
+  const userSession = useMemo(() => new UserSession({ appConfig }), [appConfig]);
 
-  function connectWallet() {
-    showConnect({
-      appDetails: {
-        name: "Stacks Account History",
-        icon: "https://cryptologos.cc/logos/stacks-stx-logo.png",
-      },
-      onFinish: () => {
-        // reload the webpage when wallet connection succeeds
-        // to ensure that the user session gets populated from local storage
-        window.location.reload();
-      },
-      userSession,
+  const connectWallet = useCallback(async () => {
+    return new Promise<UserData | null>((resolve, reject) => {
+      authenticate({
+        appDetails: {
+          name: "Stacks Account History",
+          icon: "https://cryptologos.cc/logos/stacks-stx-logo.png",
+        },
+        userSession,
+        onFinish: ({ authResponsePayload }) => {
+          const data = authResponsePayload as UserData;
+          setUserData(data);
+          resolve(data);
+        },
+        onCancel: () => reject(new Error("Wallet connection cancelled")),
+      }).catch(reject);
     });
-  }
+  }, [userSession]);
 
   function disconnectWallet() {
     // sign out the user and close their session
-      // also clear out the user data
+    // also clear out the user data
     disconnect();
     userSession.signUserOut();
     setUserData(null);
@@ -53,7 +55,7 @@ export function useStacks() {
         setUserData(userData);
       });
     }
-  }, []);
+  }, [userSession]);
 
   // return the user data, connect wallet function, and disconnect wallet function
   return { userData, connectWallet, disconnectWallet };

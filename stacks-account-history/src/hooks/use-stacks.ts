@@ -1,5 +1,7 @@
 import {
   AppConfig,
+  connect,
+  disconnect,
   showConnect,
   type UserData,
   UserSession,
@@ -34,7 +36,8 @@ export function useStacks() {
 
   function disconnectWallet() {
     // sign out the user and close their session
-    // also clear out the user data
+      // also clear out the user data
+    disconnect();
     userSession.signUserOut();
     setUserData(null);
   }

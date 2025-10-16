@@ -16,6 +16,7 @@ contract_id = 'SM1793C4R5PZ4NS4VQ4WMP7SKKYVH8JZEWSZ9HCCR.xyk-swap-helper-v-1-3'
 
 [[project.requirements]]
 contract_id = 'SM1793C4R5PZ4NS4VQ4WMP7SKKYVH8JZEWSZ9HCCR.xyk-pool-sbtc-stx-v-1-1'
+
 [contracts.lending-pool]
 path = 'contracts/lending-pool.clar'
 clarity_version = 3
@@ -35,5 +36,6 @@ trusted_caller = false
 callee_filter = false
 
 [repl.remote_data]
-enabled = false
+enabled = true
 api_url = 'https://api.hiro.so'
+use_mainnet_wallets = true

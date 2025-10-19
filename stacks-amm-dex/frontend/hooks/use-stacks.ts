@@ -7,8 +7,11 @@ import {
 } from "@/lib/amm";
 import {
   AppConfig,
+  connect,
+  disconnect,
+  isConnected,
+  getLocalStorage,
   openContractCall,
-  showConnect,
   type UserData,
   UserSession,
 } from "@stacks/connect";
@@ -20,30 +23,52 @@ const appDetails = {
   icon: "https://cryptologos.cc/logos/stacks-stx-logo.png",
 };
 
+const appConfig = new AppConfig(["store_write", "publish_data"]);
+const userSession = new UserSession({ appConfig });
+
 export function useStacks() {
   const [userData, setUserData] = useState<UserData | null>(null);
+  const [userAddress, setUserAddress] = useState<string | null>(null);
 
-  const appConfig = new AppConfig(["store_write"]);
-  const userSession = new UserSession({ appConfig });
-
-  function connectWallet() {
-    showConnect({
-      appDetails,
-      onFinish: () => {
-        window.location.reload();
-      },
-      userSession,
-    });
+  async function connectWallet() {
+    try {
+      console.log("=== Connecting Wallet ===");
+      await connect();
+      console.log("Wallet connected successfully");
+      
+      // Get user address after connection
+      let address = null;
+      if (isConnected()) {
+        const data = getLocalStorage();
+        if (data?.addresses?.stx && data.addresses.stx.length > 0) {
+          address = data.addresses.stx[0].address;
+          setUserAddress(address);
+        }
+      } else if (userSession.isUserSignedIn()) {
+        const userData = userSession.loadUserData();
+        address = userData.profile.stxAddress.testnet;
+        setUserAddress(address);
+        setUserData(userData);
+      }
+      
+      // Reload to update state
+      window.location.reload();
+    } catch (error) {
+      console.error("Connection failed:", error);
+      window.alert("Failed to connect wallet. Please try again.");
+    }
   }
 
   function disconnectWallet() {
-    userSession.signUserOut();
+    disconnect();
+    userSession.signUserOut("/");
     setUserData(null);
+    setUserAddress(null);
   }
 
   async function handleCreatePool(token0: string, token1: string, fee: number) {
     try {
-      if (!userData) throw new Error("User not connected");
+      if (!userData && !userAddress) throw new Error("User not connected");
       const options = await createPool(token0, token1, fee);
       await openContractCall({
         ...options,
@@ -64,7 +89,7 @@ export function useStacks() {
 
   async function handleSwap(pool: Pool, amount: number, zeroForOne: boolean) {
     try {
-      if (!userData) throw new Error("User not connected");
+      if (!userData && !userAddress) throw new Error("User not connected");
       const options = await swap(pool, amount, zeroForOne);
       await openContractCall({
         ...options,
@@ -89,7 +114,7 @@ export function useStacks() {
     amount1: number
   ) {
     try {
-      if (!userData) throw new Error("User not connected");
+      if (!userData && !userAddress) throw new Error("User not connected");
       const options = await addLiquidity(pool, amount0, amount1);
       await openContractCall({
         ...options,
@@ -110,7 +135,7 @@ export function useStacks() {
 
   async function handleRemoveLiquidity(pool: Pool, liquidity: number) {
     try {
-      if (!userData) throw new Error("User not connected");
+      if (!userData && !userAddress) throw new Error("User not connected");
       const options = await removeLiquidity(pool, liquidity);
       await openContractCall({
         ...options,
@@ -130,22 +155,43 @@ export function useStacks() {
   }
 
   useEffect(() => {
-    if (userSession.isSignInPending()) {
+    // Check if user is connected via new connect method
+    if (isConnected()) {
+      const data = getLocalStorage();
+      if (data?.addresses?.stx && data.addresses.stx.length > 0) {
+        const address = data.addresses.stx[0].address;
+        setUserAddress(address);
+        // Create minimal userData for compatibility
+        setUserData({
+          profile: {
+            stxAddress: {
+              testnet: address,
+              mainnet: address,
+            },
+          },
+        } as UserData);
+      }
+    } else if (userSession.isSignInPending()) {
       userSession.handlePendingSignIn().then((userData) => {
         setUserData(userData);
+        setUserAddress(userData.profile.stxAddress.testnet);
       });
     } else if (userSession.isUserSignedIn()) {
-      setUserData(userSession.loadUserData());
+      const userData = userSession.loadUserData();
+      setUserData(userData);
+      setUserAddress(userData.profile.stxAddress.testnet);
     }
   }, []);
 
   return {
     userData,
+    userAddress,
     handleCreatePool,
     handleSwap,
     handleAddLiquidity,
     handleRemoveLiquidity,
     connectWallet,
     disconnectWallet,
+    isConnected: isConnected() || userSession.isUserSignedIn(),
   };
 }
